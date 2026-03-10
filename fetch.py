@@ -67,8 +67,10 @@ def clone_repo():
 # 2. Parse README.md
 # ---------------------------------------------------------------------------
 SECTIONS = {
-    "## 💻 Software Engineering": "Software Engineering",
-    "## 🤖 Data Science":         "Data Science / AI / ML",
+    "## 💻 Software Engineering Internship Roles":              "Software Engineering",
+    "## 🤖 Data Science, AI & Machine Learning Internship Roles": "Data Science / AI / ML",
+    "## 📈 Quantitative Finance Internship Roles":              "Quantitative Finance",
+    "## 🔧 Hardware Engineering Internship Roles":              "Hardware Engineering",
 }
 
 EXCLUDE_LOCATIONS = [
@@ -276,7 +278,7 @@ COMPANY_SIGNALS = [
 NEGATIVE_SIGNALS = [
     "accounting", "finance intern", "marketing", "sales",
     "operations intern", "hr ", "recruiter", "business analyst",
-    "hardware", "electrical engineer", "mechanical engineer",
+    "electrical engineer", "mechanical engineer",
     "civil engineer", "manufacturing",
 ]
 
