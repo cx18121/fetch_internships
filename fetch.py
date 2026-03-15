@@ -207,21 +207,8 @@ def filter_internships(internships):
         kept.append(job)
     return kept, stats
 
-# ---------------------------------------------------------------------------
-# 5. Scoring — tailored to Charles Xue's resume
-#
-# Profile summary:
-#   Cornell CS + Statistics (4.0 GPA, graduating 2028)
-#   Languages  : Python, TypeScript, JavaScript, Java, Go, SQL, Bash, R
-#   Frameworks : React, Next.js, Node.js, FastAPI, Flask, Javalin, Electron
-#   Infra/Tools: PostgreSQL, Redis, Docker, Supabase, Celery, Git, Linux
-#   AI/LLM     : Claude Agent SDK, Anthropic API, Gemini API
-#   Security   : CTF top-100 US, reverse engineering, C2 implants, Ghidra
-#   Project DNA: full-stack AI products, distributed systems, REST APIs,
-#                data pipelines, real-time dashboards, desktop apps
-# ---------------------------------------------------------------------------
 
-# Tier 1 (+4): Roles that map almost perfectly to Charles's project work
+# Tier 1 (+4): Roles that map almost perfectly to project work
 TIER1_ROLE = [
     "software engineer", "software development", "swe intern",
     "full stack", "fullstack", "full-stack",
@@ -233,7 +220,7 @@ TIER1_ROLE = [
     "platform engineer", "systems engineer",
 ]
 
-# Tier 2 (+3): Strong overlap with his stack or interests
+# Tier 2 (+3): Strong overlap with stack or interests
 TIER2_ROLE = [
     "data engineer", "data science", "machine learning",
     "distributed systems", "infrastructure", "cloud engineer",
