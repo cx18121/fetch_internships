@@ -15,12 +15,12 @@ Output:
     ~/Desktop/Summer2026_Internships_YYYY-MM-DD.xlsx (Mac/Linux)
 """
 
-from fileinput import filename
 import argparse
 import subprocess
 import sys
 import os
 import re
+import json
 import datetime
 from pathlib import Path
 
@@ -51,8 +51,9 @@ except ImportError:
 # ---------------------------------------------------------------------------
 # 1. Clone / update the repo
 # ---------------------------------------------------------------------------
-REPO_URL = "https://github.com/SimplifyJobs/Summer2026-Internships.git"
-REPO_DIR = Path(__file__).parent / "Summer2026-Internships"
+REPO_URL  = "https://github.com/SimplifyJobs/Summer2026-Internships.git"
+REPO_DIR  = Path(__file__).parent / "Summer2026-Internships"
+SEEN_FILE = Path(__file__).parent / "seen_jobs.json"
 
 def clone_repo():
     if REPO_DIR.exists():
@@ -129,6 +130,7 @@ def parse_readme(days_back=0):
         sections_raw[current_key] = "\n".join(current_lines)
 
     internships = []
+    seen = set()
 
     for category, md_chunk in sections_raw.items():
         # Convert markdown to HTML for BeautifulSoup parsing
@@ -173,6 +175,11 @@ def parse_readme(days_back=0):
                 if not m or int(m.group(1)) > days_back:
                     continue
 
+                dedup_key = (company, role, location)
+                if dedup_key in seen:
+                    continue
+                seen.add(dedup_key)
+
                 internships.append({
                     "company":    company,
                     "role":       role,
@@ -194,8 +201,11 @@ def is_us_location(loc):
 def no_grad_required(role):
     return "🎓" not in role
 
+def no_closed(role):
+    return "🔒" not in role
+
 def filter_internships(internships):
-    stats = {"non_us": 0, "grad_required": 0}
+    stats = {"non_us": 0, "grad_required": 0, "closed": 0}
     kept = []
     for job in internships:
         if not is_us_location(job["location"]):
@@ -204,9 +214,48 @@ def filter_internships(internships):
         if not no_grad_required(job["role"]):
             stats["grad_required"] += 1
             continue
+        if not no_closed(job["role"]):
+            stats["closed"] += 1
+            continue
         kept.append(job)
     return kept, stats
 
+# ---------------------------------------------------------------------------
+# 5a. Seen-job persistence
+# ---------------------------------------------------------------------------
+def _job_key(job):
+    return f"{job['company']}||{job['role']}||{job['location']}"
+
+def load_seen():
+    if SEEN_FILE.exists():
+        return set(json.loads(SEEN_FILE.read_text(encoding="utf-8")))
+    return set()
+
+def save_seen(seen):
+    SEEN_FILE.write_text(json.dumps(sorted(seen), indent=2), encoding="utf-8")
+
+def mark_seen(internships):
+    """Add is_new flag to each job; update and persist the seen set."""
+    seen = load_seen()
+    for job in internships:
+        key = _job_key(job)
+        job["is_new"] = key not in seen
+        seen.add(key)
+    save_seen(seen)
+
+# ---------------------------------------------------------------------------
+# 5. Scoring — tailored to Charles Xue's resume
+#
+# Profile summary:
+#   Cornell CS + Statistics (4.0 GPA, graduating 2028)
+#   Languages  : Python, TypeScript, JavaScript, Java, Go, SQL, Bash, R
+#   Frameworks : React, Next.js, Node.js, FastAPI, Flask, Javalin, Electron
+#   Infra/Tools: PostgreSQL, Redis, Docker, Supabase, Celery, Git, Linux
+#   AI/LLM     : Claude Agent SDK, Anthropic API, Gemini API
+#   Security   : CTF top-100 US, reverse engineering, C2 implants, Ghidra
+#   Project DNA: full-stack AI products, distributed systems, REST APIs,
+#                data pipelines, real-time dashboards, desktop apps
+# ---------------------------------------------------------------------------
 
 # Tier 1 (+4): Roles that map almost perfectly to project work
 TIER1_ROLE = [
@@ -329,8 +378,8 @@ def build_excel(internships, output_path):
     ws.title = "Summer 2026 Internships"
 
     # Header
-    headers = ["#", "Company", "Role", "Category", "Location", "Fit", "Score", "Apply"]
-    col_widths = [4, 22, 40, 20, 22, 16, 7, 10]
+    headers = ["#", "New", "Company", "Role", "Category", "Location", "Fit", "Score", "Apply"]
+    col_widths = [4, 7, 22, 40, 20, 22, 16, 7, 10]
 
     header_font  = Font(name="Arial", bold=True, color=WHITE, size=10)
     header_fill  = PatternFill("solid", start_color=NAVY)
@@ -373,15 +422,24 @@ def build_excel(internships, output_path):
             c.fill = custom_fill or tier_fill
 
         wr(1, row_idx - 1, center_align)
-        wr(2, job["company"])
-        wr(3, job["role"], wrap_align)
-        wr(4, job["category"])
-        wr(5, job["location"], wrap_align)
-        wr(6, label, center_align)
-        wr(7, job["score"], center_align)
+
+        # "New" column
+        is_new = job.get("is_new", True)
+        new_label = "✓ New" if is_new else "— Seen"
+        new_font  = Font(name="Arial", size=9,
+                         color="2E7D32" if is_new else "9E9E9E",
+                         bold=is_new)
+        wr(2, new_label, center_align, font=new_font)
+
+        wr(3, job["company"])
+        wr(4, job["role"], wrap_align)
+        wr(5, job["category"])
+        wr(6, job["location"], wrap_align)
+        wr(7, label, center_align)
+        wr(8, job["score"], center_align)
 
         # Apply hyperlink cell
-        apply_cell = ws.cell(row=row_idx, column=8, value="Apply →")
+        apply_cell = ws.cell(row=row_idx, column=9, value="Apply →")
         if job["apply_url"]:
             apply_cell.hyperlink = job["apply_url"]
         apply_cell.font = Font(name="Arial", size=9, color=BLUE, underline="single")
@@ -452,7 +510,7 @@ def load_env():
         key, _, value = line.partition("=")
         os.environ.setdefault(key.strip(), value.strip())
 
-def send_email(output_path, to_addr, stats, by_tier, by_cat, label):
+def send_email(output_path, to_addr, stats, by_tier, by_cat, label, new_count=None):
     import smtplib
     from email.message import EmailMessage
 
@@ -470,9 +528,10 @@ def send_email(output_path, to_addr, stats, by_tier, by_cat, label):
     body = f"""\
 Summer 2026 Internship Digest — {today}
 
-{label} postings found : {sum(by_cat.values()) + stats['non_us'] + stats['grad_required']}
+{label} postings found : {sum(by_cat.values()) + stats['non_us'] + stats['grad_required'] + stats['closed']}
 Excluded (non-US)      : {stats['non_us']}
 Excluded (grad 🎓)     : {stats['grad_required']}
+Excluded (closed 🔒)   : {stats['closed']}
 ──────────────────────────────
 Kept                   : {sum(by_cat.values())}
 
@@ -486,7 +545,8 @@ By category:
 """ + "\n".join(f"  • {cat:<28} {count}" for cat, count in sorted(by_cat.items())) + "\n\nSpreadsheet attached."
 
     msg = EmailMessage()
-    msg["Subject"] = f"[Internships] {excellent} Excellent, {good} Good — {today}"
+    new_str = f", {new_count} new" if new_count is not None else ""
+    msg["Subject"] = f"[Internships] {excellent} Excellent, {good} Good{new_str} — {today}"
     msg["From"]    = gmail_user
     msg["To"]      = to_addr
     msg.set_content(body)
@@ -552,10 +612,11 @@ def main():
     filtered, stats = filter_internships(all_jobs)
     excluded_total = len(all_jobs) - len(filtered)
 
-    # Step 5: Score & sort
+    # Step 5: Score, mark seen, sort (new first, then by score)
     for job in filtered:
         job["score"] = score(job)
-    filtered.sort(key=lambda x: x["score"], reverse=True)
+    mark_seen(filtered)
+    filtered.sort(key=lambda x: (not x["is_new"], -x["score"], x["company"]))
 
     # Step 6: Build Excel
     print(f"\nBuilding Excel with {len(filtered)} internships...")
@@ -575,8 +636,13 @@ def main():
     print(f"  Total {label} postings found  : {len(all_jobs)}")
     print(f"  Excluded (non-US location) : {stats['non_us']}")
     print(f"  Excluded (grad degree 🎓)  : {stats['grad_required']}")
+    print(f"  Excluded (closed 🔒)       : {stats['closed']}")
     print(f"  ─────────────────────────────")
     print(f"  Final internships kept     : {len(filtered)}")
+    new_count  = sum(1 for j in filtered if j["is_new"])
+    seen_count = len(filtered) - new_count
+    print(f"    ✓ New                    : {new_count}")
+    print(f"    — Seen (prev. runs)      : {seen_count}")
     print(f"\n  By category:")
     for cat, count in sorted(by_cat.items()):
         print(f"    • {cat:<28} {count}")
@@ -589,7 +655,7 @@ def main():
     print("=" * 60)
 
     if args.email:
-        send_email(output_path, args.email, stats, by_tier, by_cat, label)
+        send_email(output_path, args.email, stats, by_tier, by_cat, label, new_count)
 
 if __name__ == "__main__":
     main()
