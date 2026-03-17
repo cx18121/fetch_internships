@@ -582,6 +582,10 @@ def main():
     args = parser.parse_args()
     days_back = args.days
 
+    # Fall back to TO_EMAIL from .env if --email not provided
+    load_env()
+    email_addr = args.email or os.environ.get("TO_EMAIL")
+
     today = datetime.date.today().strftime("%Y-%m-%d")
     filename = f"Summer2026_Internships_{today}.xlsx"
 
@@ -654,8 +658,8 @@ def main():
     print(f"     {output_path}")
     print("=" * 60)
 
-    if args.email:
-        send_email(output_path, args.email, stats, by_tier, by_cat, label, new_count)
+    if email_addr:
+        send_email(output_path, email_addr, stats, by_tier, by_cat, label, new_count)
 
 if __name__ == "__main__":
     main()

@@ -1,8 +1,7 @@
 #!/bin/bash
 # Daily internship fetcher — alternative to run_daily.bat for running directly in WSL/Linux.
-# Credentials are read from .env next to fetch.py — do not put them here.
+# Email recipient and credentials are read from .env next to fetch.py.
 
-TO_EMAIL="charlie.l.xue@gmail.com"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-python3 "$SCRIPT_DIR/fetch.py" -d 1 --email "$TO_EMAIL"
+python3 "$SCRIPT_DIR/fetch.py" -d 1
