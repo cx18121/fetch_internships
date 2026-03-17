@@ -1,4 +1,3 @@
-# fetch_internships
 
 Fetches CS internship postings from the SimplifyJobs github repo, scores them against a resume profile, and outputs a styled Excel spreadsheet.
 
